@@ -7,8 +7,8 @@
   "license": "MIT",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
-    "format:fix": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.mjs\"",
+    "format:fix": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.mjs\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -16,10 +16,13 @@
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest",
+    "posttest": "npm run test:seed",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:seed": "node --check scripts/seed-demo.mjs && node --check scripts/seed-core.mjs && node --check scripts/seed-guards.mjs && node --check scripts/seed-http.mjs && node --check scripts/fake-api.mjs && node --test \"scripts/*.test.mjs\"",
+    "seed:demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1165.0",
@@ -50,6 +53,7 @@
     "@types/node": "^24.0.0",
     "@types/pdfkit": "^0.17.7",
     "@types/supertest": "^7.0.0",
+    "dotenv": "17.4.1",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",

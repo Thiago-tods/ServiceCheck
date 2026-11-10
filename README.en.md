@@ -19,6 +19,8 @@ Open source portfolio project. Not commercial; no monetization.
 - Asynchronous **PDF** report, dashboard, in-app notifications, immutable audit trail.
 - UI in **Portuguese and English**, light/dark theme, IBM Plex Sans/Mono.
 
+> The backend covers more than the app: registers, order creation and PDF reports, for example, exist only in the API. See [what the app has and what exists only in the API](#what-the-app-has-and-what-exists-only-in-the-api).
+
 ## Stack
 
 | Layer | Technologies |
@@ -39,15 +41,18 @@ Details: [docs/adr/0006-offline-sync.md](docs/adr/0006-offline-sync.md) (Portugu
 
 ## Getting started
 
-Full guide (Windows / PowerShell): [docs/development.md](docs/development.md).
+Full guide (Windows / PowerShell), including demo data and building the APK: [docs/development.md](docs/development.md).
 
 ```powershell
 cd backend
 npm install
 Copy-Item .env.example .env
+# edit backend/.env: DATABASE_URL and JWT_ACCESS_SECRET (see below)
 npx prisma migrate deploy
 npm run start:dev
 ```
+
+Before starting, edit `backend/.env`: `DATABASE_URL` and a random JWT secret (the example value works for development only; with `NODE_ENV=production`, or with `NODE_ENV` unset, the API refuses to start). Details, the local database and **demo data** (`npm run seed:demo`) are in [docs/development.md](docs/development.md) (Portuguese).
 
 ```powershell
 cd mobile
@@ -73,16 +78,46 @@ servicecheck/
 
 Documentation is written in Portuguese.
 
+## What the app has and what exists only in the API
+
+The backend is more complete than the app. Today the app covers the technician's work and the simplest office decisions; everything else can only be done by calling the API.
+
+| Feature | API | App |
+|---|---|---|
+| Login, logout, session renewal | yes | yes |
+| Order list and detail, agenda, dashboard, notifications | yes | yes |
+| Start execution, checklist, notes, photos (camera and gallery), signature, finish; all offline with sync | yes | yes |
+| Approve an execution and review a signature (Owner/Admin) | yes | yes, Owner/Admin only |
+| Reopen an order with a justification | yes | **no** (the app only shows the notice of an already reopened order) |
+| Create, assign and cancel orders | yes | **no** |
+| Registers: clients, contacts, addresses, specialties, teams, services, checklists and members | yes | **no** |
+| PDF report (asynchronous generation and download) | yes | **no** (no screen to request or view reports) |
+| User sign-up (`/auth/register`) | yes | **no** (no sign-up screen; use the API or `npm run seed:demo`) |
+| Native push notifications | no | no |
+
 ## Project status and known limits
 
-Verified by automated tests: backend (unit and integration against real PostgreSQL, including concurrency), app (sync logic, HTTP client, main screens) and debug APK compilation.
+**Automated tests.** The numbers below come from running the tests in this repository's working tree. The last verification on a **clean clone** (dependencies installed from scratch) happened before the current JWT secret policy and demo seed, and passed with backend 34 unit and 71 integration tests, 51 Flutter tests and the debug APK; **it has not been repeated with the current code yet**.
 
-**Not** yet verified or out of scope:
+- Backend: 110 unit tests (Jest, including the environment validation and the JWT secret policy), 153 tests of the demo-data script (`node:test`) and 71 integration tests against real PostgreSQL, including concurrency.
+- Flutter: 51 tests and `flutter analyze` with no findings. The debug APK builds.
 
-- Running on a device/emulator, and iOS (no iOS build on this machine).
-- S3 driver and Sentry against real services (tested with fakes / disabled without a DSN).
-- Native push, creating and assigning orders from the app (done through the API), signature review by non-admin members in the app.
+**Manual validation on the Android emulator** (Pixel_10, Android 37) against a local backend, through the app UI: login, logout (the session ends and the refresh-token family is revoked), automatic renewal of an expired access token, return to login when the refresh token is invalid, offline execution, sync on reconnection, handling of an operation rejected by the server, camera (online and offline), on-screen signature, finishing with validations, and approval by the Owner.
+
+A few cases were verified by **calling the API directly, not through the UI**: approval denied to a participant of the execution and to a Professional, refresh-token reuse and expiry, and the server-side finish validation.
+
+**Not yet validated:**
+
+- A physical device and iOS (the app has never been built for iOS).
+- The S3 driver and Sentry against real services (tested with fakes only; Sentry stays off without a DSN).
+- **GitHub Actions:** the workflows exist in `.github/workflows` but have not been run on GitHub yet.
+
+**Limitations:**
+
+- See the table above for what has no screen in the app.
 - Rate limiting behind a reverse proxy requires enabling `trust proxy` (off by default, on purpose).
+- **Personal data:** the system stores client data (name, address, photos, signature). There is **no** account or data deletion, retention policy, export or privacy policy yet. Do not use it with real third-party data before implementing them.
+- The release APK is signed with the debug key and is not ready for distribution; the debug APK is for development only.
 
 ## License
 
