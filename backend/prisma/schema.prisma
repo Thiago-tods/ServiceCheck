@@ -7,4 +7,82 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Models arrive in later phases, together with their migrations.
+enum Role {
+  OWNER
+  ADMIN
+  RECEPTIONIST
+  PROFESSIONAL
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  name         String
+  locale       String   @default("pt_BR")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+}
+
+model Company {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+}
+
+/// A user may belong to several companies; role and permissions are per company.
+model Membership {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @db.Uuid
+  companyId           String   @db.Uuid
+  role                Role
+  /// Explicit permission to review missing/refused signatures without being Owner/Admin.
+  canReviewSignatures Boolean  @default(false)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+}
+
+/// Rotating refresh tokens. Only the SHA-256 hash is stored.
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  familyId     String    @db.Uuid
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+/// Append-only audit trail. Never updated or deleted by application code.
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String?  @db.Uuid
+  actorUserId String?  @db.Uuid
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+}

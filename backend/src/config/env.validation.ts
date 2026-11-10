@@ -20,6 +20,18 @@ export class EnvironmentVariables {
   @IsString()
   @MinLength(1)
   DATABASE_URL!: string;
+
+  @IsString()
+  @MinLength(32)
+  JWT_ACCESS_SECRET!: string;
+
+  @IsInt()
+  @Min(60)
+  JWT_ACCESS_TTL_SECONDS: number = 900;
+
+  @IsInt()
+  @Min(1)
+  REFRESH_TTL_DAYS: number = 30;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
