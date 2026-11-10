@@ -1,4 +1,4 @@
-﻿# ServiceCheck
+# ServiceCheck
 
 > Field work. Control at every step.
 
@@ -10,7 +10,19 @@ Open source portfolio project. Not commercial; no monetization.
 
 ## Status
 
-Phase 0 — initial monorepo structure. No features implemented yet.
+Phase 1 — backend skeleton (NestJS, Prisma, health check). No business features yet.
+
+### Backend
+
+```powershell
+cd backend
+npm install
+Copy-Item .env.example .env   # adjust DATABASE_URL
+npx prisma generate
+npm run start:dev
+```
+
+Health: `GET /api/v1/health` and `GET /api/v1/health/ready`.
 
 ## Stack
 

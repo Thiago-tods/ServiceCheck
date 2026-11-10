@@ -1,4 +1,4 @@
-﻿# ADR 0001 — Monorepo com monólito modular
+# ADR 0001 — Monorepo com monólito modular
 
 - Status: aceito
 - Data: 2026-11-10
