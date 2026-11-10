@@ -20,13 +20,13 @@ export async function createTestApp(): Promise<TestApp> {
   return { app, prisma: app.get(PrismaService), http: () => app.getHttpServer() as Server };
 }
 
-/** TRUNCATE is allowed on AuditLog; only row UPDATE/DELETE are blocked by trigger. */
+/** TRUNCATE is allowed on append-only tables; only row UPDATE/DELETE are blocked by triggers. */
 export async function resetDb(prisma: PrismaService): Promise<void> {
-  await prisma.$executeRawUnsafe(
-    'TRUNCATE "RefreshToken","AuditLog","Membership","Company","User" RESTART IDENTITY CASCADE',
-  );
+  const tables = await prisma.$queryRaw<{ tablename: string }[]>`
+    SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
+  const list = tables.map((r) => `"${r.tablename}"`).join(',');
+  await prisma.$executeRawUnsafe(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
 }
-
 export interface Session {
   userId: string;
   email: string;
@@ -69,4 +69,32 @@ export async function createCompany(t: TestApp, s: Session, name = 'Acme'): Prom
     .send({ name })
     .expect(201);
   return (res.body as { id: string }).id;
+}
+
+/** Adds an existing user to a company with the given role; returns the membership id. */
+export async function addMember(
+  t: TestApp,
+  owner: Session,
+  companyId: string,
+  email: string,
+  role: 'OWNER' | 'ADMIN' | 'RECEPTIONIST' | 'PROFESSIONAL',
+): Promise<string> {
+  const res = await request(t.http())
+    .post('/api/v1/members')
+    .set(...bearer(owner))
+    .set('X-Company-Id', companyId)
+    .send({ email, role })
+    .expect(201);
+  return (res.body as { id: string }).id;
+}
+
+/** Authenticated request builder scoped to a company. */
+export function api(t: TestApp, s: Session, companyId: string) {
+  const set = (r: request.Test) => r.set(...bearer(s)).set('X-Company-Id', companyId);
+  return {
+    get: (p: string) => set(request(t.http()).get(`/api/v1${p}`)),
+    post: (p: string, body: object = {}) => set(request(t.http()).post(`/api/v1${p}`).send(body)),
+    patch: (p: string, body: object = {}) => set(request(t.http()).patch(`/api/v1${p}`).send(body)),
+    put: (p: string, body: object = {}) => set(request(t.http()).put(`/api/v1${p}`).send(body)),
+  };
 }

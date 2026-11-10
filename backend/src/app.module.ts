@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { CatalogModule } from './catalog/catalog.module';
+import { ClientsModule } from './clients/clients.module';
+import { PeopleModule } from './people/people.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
@@ -18,6 +21,9 @@ import { TenantGuard } from './tenancy/tenant.guard';
     AuditModule,
     AuthModule,
     TenancyModule,
+    ClientsModule,
+    PeopleModule,
+    CatalogModule,
     HealthModule,
   ],
   providers: [

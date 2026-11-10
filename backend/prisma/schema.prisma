@@ -34,6 +34,10 @@ model Company {
   updatedAt DateTime @updatedAt
 
   memberships Membership[]
+  clients     Client[]
+  specialties Specialty[]
+  teams       Team[]
+  services    Service[]
 }
 
 /// A user may belong to several companies; role and permissions are per company.
@@ -50,6 +54,9 @@ model Membership {
 
   user    User    @relation(fields: [userId], references: [id])
   company Company @relation(fields: [companyId], references: [id])
+
+  specialties MembershipSpecialty[]
+  teams       TeamMember[]
 
   @@unique([userId, companyId])
   @@index([companyId])
@@ -85,4 +92,150 @@ model AuditLog {
 
   @@index([companyId, createdAt])
   @@index([entityType, entityId])
+}
+
+enum ChecklistItemKind {
+  CHECK
+  TEXT
+  NUMBER
+  PHOTO
+}
+
+model Client {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  name      String
+  document  String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company         @relation(fields: [companyId], references: [id])
+  contacts  ClientContact[]
+  addresses ClientAddress[]
+
+  @@index([companyId, name])
+}
+
+model ClientContact {
+  id        String  @id @default(uuid()) @db.Uuid
+  companyId String  @db.Uuid
+  clientId  String  @db.Uuid
+  name      String
+  role      String?
+  phone     String?
+  email     String?
+  active    Boolean @default(true)
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([companyId, clientId])
+}
+
+model ClientAddress {
+  id         String  @id @default(uuid()) @db.Uuid
+  companyId  String  @db.Uuid
+  clientId   String  @db.Uuid
+  label      String
+  street     String
+  number     String?
+  complement String?
+  district   String?
+  city       String
+  state      String
+  zip        String?
+  latitude   Float?
+  longitude  Float?
+  active     Boolean @default(true)
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([companyId, clientId])
+}
+
+model Specialty {
+  id        String  @id @default(uuid()) @db.Uuid
+  companyId String  @db.Uuid
+  name      String
+  active    Boolean @default(true)
+
+  company Company               @relation(fields: [companyId], references: [id])
+  members MembershipSpecialty[]
+
+  @@unique([companyId, name])
+}
+
+model MembershipSpecialty {
+  membershipId String @db.Uuid
+  specialtyId  String @db.Uuid
+
+  membership Membership @relation(fields: [membershipId], references: [id])
+  specialty  Specialty  @relation(fields: [specialtyId], references: [id])
+
+  @@id([membershipId, specialtyId])
+}
+
+model Team {
+  id        String  @id @default(uuid()) @db.Uuid
+  companyId String  @db.Uuid
+  name      String
+  active    Boolean @default(true)
+
+  company Company      @relation(fields: [companyId], references: [id])
+  members TeamMember[]
+
+  @@unique([companyId, name])
+}
+
+model TeamMember {
+  teamId       String @db.Uuid
+  membershipId String @db.Uuid
+
+  team       Team       @relation(fields: [teamId], references: [id])
+  membership Membership @relation(fields: [membershipId], references: [id])
+
+  @@id([teamId, membershipId])
+}
+
+model Service {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  company  Company                   @relation(fields: [companyId], references: [id])
+  versions ServiceChecklistVersion[]
+
+  @@unique([companyId, name])
+}
+
+/// Immutable once created (enforced by trigger). Editing a checklist means publishing a new version.
+model ServiceChecklistVersion {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  serviceId String   @db.Uuid
+  version   Int
+  createdBy String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  service Service         @relation(fields: [serviceId], references: [id])
+  items   ChecklistItem[]
+
+  @@unique([serviceId, version])
+}
+
+model ChecklistItem {
+  id        String            @id @default(uuid()) @db.Uuid
+  versionId String            @db.Uuid
+  position  Int
+  label     String
+  kind      ChecklistItemKind @default(CHECK)
+  required  Boolean           @default(false)
+
+  checklistVersion ServiceChecklistVersion @relation(fields: [versionId], references: [id])
+
+  @@unique([versionId, position])
 }
