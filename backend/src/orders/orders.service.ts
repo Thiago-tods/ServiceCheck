@@ -1,18 +1,41 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role, WorkOrderStatus } from '@prisma/client';
-import { AuditService } from '../audit/audit.service';
+import { OrderEventsService } from './order-events.service';
 import { TenantContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
-import { lockOrder, ServiceSnapshot, transition } from './order-state';
+import { lockOrder, ServiceSnapshot, transition, Tx } from './order-state';
 import { CreateOrderDto, OrderListQuery, SignatureReviewDto } from './orders.dto';
 
 const ADMINS: Role[] = [Role.OWNER, Role.ADMIN];
+
+const ORDER_DETAIL = {
+  assignments: { orderBy: { createdAt: 'asc' } },
+  executions: {
+    orderBy: { sequence: 'asc' },
+    include: {
+      participants: true,
+      items: { orderBy: { position: 'asc' } },
+      notes: { orderBy: { createdAt: 'asc' } },
+      reviews: { orderBy: { createdAt: 'asc' } },
+      signature: {
+        select: {
+          id: true,
+          status: true,
+          signerName: true,
+          reason: true,
+          capturedAt: true,
+          capturedBy: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.WorkOrderInclude;
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
+    private readonly events: OrderEventsService,
   ) {}
 
   private log(
@@ -20,24 +43,14 @@ export class OrdersService {
     actor: string,
     orderId: string,
     action: string,
-    metadata?: object,
-    tx?: Prisma.TransactionClient,
+    metadata: object | undefined,
+    tx: Tx,
   ) {
-    return this.audit.record(
-      {
-        companyId: t.companyId,
-        actorUserId: actor,
-        action,
-        entityType: 'WorkOrder',
-        entityId: orderId,
-        metadata: metadata,
-      },
-      tx,
-    );
+    return this.events.record(t, actor, orderId, action, metadata, tx);
   }
 
   async create(t: TenantContext, actor: string, dto: CreateOrderDto) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const client = await tx.client.findFirst({
         where: { id: dto.clientId, companyId: t.companyId, active: true },
       });
@@ -158,33 +171,33 @@ export class OrdersService {
   async get(t: TenantContext, id: string) {
     const order = await this.prisma.workOrder.findFirst({
       where: { id, companyId: t.companyId, ...this.visibility(t) },
-      include: {
-        assignments: { orderBy: { createdAt: 'asc' } },
-        executions: {
-          orderBy: { sequence: 'asc' },
-          include: {
-            participants: true,
-            items: { orderBy: { position: 'asc' } },
-            notes: { orderBy: { createdAt: 'asc' } },
-            reviews: { orderBy: { createdAt: 'asc' } },
-            signature: {
-              select: {
-                id: true,
-                status: true,
-                signerName: true,
-                reason: true,
-                capturedAt: true,
-                capturedBy: true,
-              },
-            },
-          },
-        },
-      },
+      include: ORDER_DETAIL,
     });
     if (!order) throw new NotFoundException('Work order not found');
     return order;
   }
 
+  /** Orders visible to the caller that changed after `since` (2 s overlap guards against late commits). */
+  async changedSince(t: TenantContext, since: Date | undefined, limit: number) {
+    const from = since ? new Date(since.getTime() - 2000) : undefined;
+    const rows = await this.prisma.workOrder.findMany({
+      where: {
+        companyId: t.companyId,
+        ...this.visibility(t),
+        ...(from ? { updatedAt: { gt: from } } : {}),
+      },
+      orderBy: { updatedAt: 'asc' },
+      take: limit + 1,
+      include: ORDER_DETAIL,
+    });
+    const hasMore = rows.length > limit;
+    const orders = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      orders,
+      hasMore,
+      nextCursor: orders.length ? orders[orders.length - 1].updatedAt : (since ?? null),
+    };
+  }
   history(t: TenantContext, id: string, limit: number) {
     return this.prisma.auditLog.findMany({
       where: { companyId: t.companyId, entityType: 'WorkOrder', entityId: id },
@@ -194,7 +207,7 @@ export class OrdersService {
   }
 
   async cancel(t: TenantContext, actor: string, id: string, reason: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const order = await lockOrder(tx, t.companyId, id);
       await transition(tx, order, ['OPEN', 'SCHEDULED'], 'CANCELLED', { cancelReason: reason });
       // Free the professionals' calendars; the assignment rows stay as history.
@@ -209,7 +222,7 @@ export class OrdersService {
 
   /** Approval must be independent from execution: no participant may approve. */
   async approve(t: TenantContext, actor: string, id: string, note?: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const order = await lockOrder(tx, t.companyId, id);
       const latest = await tx.execution.findFirst({
         where: { workOrderId: id },
@@ -227,7 +240,7 @@ export class OrdersService {
 
   /** Reopening starts a brand-new execution; the previous one is preserved untouched. */
   async reopen(t: TenantContext, actor: string, id: string, reason: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const order = await lockOrder(tx, t.companyId, id);
       const last = await tx.execution.aggregate({
         where: { workOrderId: id },
@@ -276,7 +289,7 @@ export class OrdersService {
     if (!ADMINS.includes(t.role) && !t.canReviewSignatures) {
       throw new ForbiddenException('No permission to review signatures');
     }
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const order = await lockOrder(tx, t.companyId, id);
       const execution = await tx.execution.findFirst({
         where: { workOrderId: id, status: 'FINISHED' },

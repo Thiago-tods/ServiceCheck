@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
+import { OrderEventsService } from './order-events.service';
 import { TenantContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockOrder, ServiceSnapshot, transition, Tx } from './order-state';
@@ -18,7 +18,7 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 export class ExecutionsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
+    private readonly events: OrderEventsService,
   ) {}
 
   private log(
@@ -26,25 +26,15 @@ export class ExecutionsService {
     actor: string,
     orderId: string,
     action: string,
-    metadata: object,
+    metadata: object | undefined,
     tx: Tx,
   ) {
-    return this.audit.record(
-      {
-        companyId: t.companyId,
-        actorUserId: actor,
-        action,
-        entityType: 'WorkOrder',
-        entityId: orderId,
-        metadata: metadata,
-      },
-      tx,
-    );
+    return this.events.record(t, actor, orderId, action, metadata, tx);
   }
 
   /** Starts (or resumes a PENDING, e.g. reopened) execution for the assigned technicians. */
   async start(t: TenantContext, actor: string, orderId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const order = await lockOrder(tx, t.companyId, orderId);
       const assignments = await tx.workOrderAssignment.findMany({
         where: { workOrderId: orderId, releasedAt: null },
@@ -128,7 +118,7 @@ export class ExecutionsService {
     itemId: string,
     dto: UpdateItemDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const { execution } = await this.participantContext(tx, t, executionId);
       const item = await tx.executionChecklistItem.findFirst({
         where: { id: itemId, executionId },
@@ -170,11 +160,11 @@ export class ExecutionsService {
     });
   }
 
-  async addNote(t: TenantContext, actor: string, executionId: string, text: string) {
-    return this.prisma.$transaction(async (tx) => {
+  async addNote(t: TenantContext, actor: string, executionId: string, text: string, id?: string) {
+    return this.prisma.transactional(async (tx) => {
       const { execution } = await this.participantContext(tx, t, executionId);
       const note = await tx.executionNote.create({
-        data: { executionId, membershipId: t.membershipId, text },
+        data: { id, executionId, membershipId: t.membershipId, text },
       });
       await this.log(
         t,
@@ -189,7 +179,7 @@ export class ExecutionsService {
   }
 
   async setPrimary(t: TenantContext, actor: string, executionId: string, membershipId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const { execution } = await this.participantContext(tx, t, executionId);
       await lockOrder(tx, t.companyId, execution.workOrderId);
       const target = execution.participants.find((p) => p.membershipId === membershipId);
@@ -226,7 +216,7 @@ export class ExecutionsService {
     executionId: string,
     dto: CaptureSignatureDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const { execution, me } = await this.participantContext(tx, t, executionId);
       if (!me.isPrimary)
         throw new ForbiddenException('Only the primary technician captures the signature');
@@ -275,7 +265,7 @@ export class ExecutionsService {
 
   /** Finishing needs: primary technician, required items done, and a signature decision recorded. */
   async finish(t: TenantContext, actor: string, executionId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const { execution, me } = await this.participantContext(tx, t, executionId);
       if (!me.isPrimary) throw new ForbiddenException('Only the primary technician can finish');
       const order = await lockOrder(tx, t.companyId, execution.workOrderId);

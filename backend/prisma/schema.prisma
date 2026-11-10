@@ -422,3 +422,39 @@ model SignatureReview {
 
   @@index([executionId])
 }
+
+enum OperationStatus {
+  APPLIED
+  CONFLICT
+  REJECTED
+}
+
+/// Server side of the client's outbox: one row per operationId, so replays are safe.
+/// The payload of conflicting/rejected operations is preserved, never dropped.
+model ProcessedOperation {
+  id           String          @id @db.Uuid
+  companyId    String          @db.Uuid
+  membershipId String          @db.Uuid
+  type         String
+  status       OperationStatus
+  payload      Json
+  response     Json?
+  createdAt    DateTime        @default(now())
+
+  @@index([companyId, status])
+}
+
+model Notification {
+  id           String    @id @default(uuid()) @db.Uuid
+  companyId    String    @db.Uuid
+  membershipId String    @db.Uuid
+  type         String
+  title        String
+  body         String?
+  entityType   String?
+  entityId     String?
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([companyId, membershipId, readAt])
+}

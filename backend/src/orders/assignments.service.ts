@@ -5,10 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
-import { AuditService } from '../audit/audit.service';
+import { OrderEventsService } from './order-events.service';
 import { TenantContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
-import { isExclusionViolation, lockOrder, transition } from './order-state';
+import { isExclusionViolation, lockOrder, transition, Tx } from './order-state';
 import { AgendaQuery, AssignDto } from './orders.dto';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -17,7 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export class AssignmentsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
+    private readonly events: OrderEventsService,
   ) {}
 
   private log(
@@ -25,20 +25,10 @@ export class AssignmentsService {
     actor: string,
     orderId: string,
     action: string,
-    metadata: object,
-    tx: Prisma.TransactionClient,
+    metadata: object | undefined,
+    tx: Tx,
   ) {
-    return this.audit.record(
-      {
-        companyId: t.companyId,
-        actorUserId: actor,
-        action,
-        entityType: 'WorkOrder',
-        entityId: orderId,
-        metadata: metadata,
-      },
-      tx,
-    );
+    return this.events.record(t, actor, orderId, action, metadata, tx);
   }
 
   async assign(t: TenantContext, actor: string, orderId: string, dto: AssignDto) {
@@ -50,7 +40,7 @@ export class AssignmentsService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.transactional(async (tx) => {
         const order = await lockOrder(tx, t.companyId, orderId);
         if (!['OPEN', 'SCHEDULED', 'IN_PROGRESS'].includes(order.status)) {
           throw new ConflictException(`Cannot assign while the order is ${order.status}`);
@@ -158,7 +148,7 @@ export class AssignmentsService {
     assignmentId: string,
     reason: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transactional(async (tx) => {
       const order = await lockOrder(tx, t.companyId, orderId);
       const assignment = await tx.workOrderAssignment.findFirst({
         where: { id: assignmentId, workOrderId: orderId, companyId: t.companyId, releasedAt: null },
@@ -205,7 +195,14 @@ export class AssignmentsService {
       if (others.length === 0 && order.status === 'SCHEDULED') {
         await transition(tx, order, ['SCHEDULED'], 'OPEN');
       }
-      await this.log(t, actor, orderId, 'order.unassigned', { assignmentId, reason }, tx);
+      await this.log(
+        t,
+        actor,
+        orderId,
+        'order.unassigned',
+        { assignmentId, reason, membershipId: assignment.membershipId },
+        tx,
+      );
       return { released: true };
     });
   }
