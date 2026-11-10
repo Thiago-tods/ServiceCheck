@@ -33,11 +33,13 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships Membership[]
-  clients     Client[]
-  specialties Specialty[]
-  teams       Team[]
-  services    Service[]
+  memberships  Membership[]
+  clients      Client[]
+  specialties  Specialty[]
+  teams        Team[]
+  services     Service[]
+  workOrders   WorkOrder[]
+  orderCounter WorkOrderCounter?
 }
 
 /// A user may belong to several companies; role and permissions are per company.
@@ -55,8 +57,10 @@ model Membership {
   user    User    @relation(fields: [userId], references: [id])
   company Company @relation(fields: [companyId], references: [id])
 
-  specialties MembershipSpecialty[]
-  teams       TeamMember[]
+  specialties    MembershipSpecialty[]
+  teams          TeamMember[]
+  assignments    WorkOrderAssignment[]
+  participations ExecutionParticipant[]
 
   @@unique([userId, companyId])
   @@index([companyId])
@@ -238,4 +242,183 @@ model ChecklistItem {
   checklistVersion ServiceChecklistVersion @relation(fields: [versionId], references: [id])
 
   @@unique([versionId, position])
+}
+
+enum WorkOrderStatus {
+  OPEN
+  SCHEDULED
+  IN_PROGRESS
+  SIGNATURE_REVIEW
+  PENDING_APPROVAL
+  APPROVED
+  CANCELLED
+}
+
+enum ExecutionStatus {
+  PENDING
+  IN_PROGRESS
+  FINISHED
+}
+
+enum SignatureStatus {
+  SIGNED
+  REFUSED
+  ABSENT
+}
+
+enum ReviewDecision {
+  ACCEPT
+  RETURN
+}
+
+/// Per-company sequential order numbers, incremented atomically.
+model WorkOrderCounter {
+  companyId String @id @db.Uuid
+  last      Int    @default(0)
+
+  company Company @relation(fields: [companyId], references: [id])
+}
+
+model WorkOrder {
+  id                 String          @id @default(uuid()) @db.Uuid
+  companyId          String          @db.Uuid
+  number             Int
+  title              String
+  description        String?
+  status             WorkOrderStatus @default(OPEN)
+  /// Incremented on every state change; used for optimistic concurrency and sync conflicts.
+  version            Int             @default(1)
+  clientId           String          @db.Uuid
+  serviceId          String          @db.Uuid
+  checklistVersionId String?         @db.Uuid
+  /// Historical copies: later edits to client/service never rewrite what the order recorded.
+  clientSnapshot     Json
+  serviceSnapshot    Json
+  cancelReason       String?
+  createdBy          String?         @db.Uuid
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  company     Company               @relation(fields: [companyId], references: [id])
+  assignments WorkOrderAssignment[]
+  executions  Execution[]
+
+  @@unique([companyId, number])
+  @@index([companyId, status])
+  @@index([companyId, clientId])
+}
+
+/// Assignment history: rows are released (releasedAt), never deleted.
+model WorkOrderAssignment {
+  id            String    @id @default(uuid()) @db.Uuid
+  companyId     String    @db.Uuid
+  workOrderId   String    @db.Uuid
+  membershipId  String    @db.Uuid
+  isPrimary     Boolean   @default(false)
+  startsAt      DateTime
+  endsAt        DateTime
+  createdBy     String?   @db.Uuid
+  createdAt     DateTime  @default(now())
+  releasedAt    DateTime?
+  releasedBy    String?   @db.Uuid
+  releaseReason String?
+
+  workOrder  WorkOrder  @relation(fields: [workOrderId], references: [id])
+  membership Membership @relation(fields: [membershipId], references: [id])
+
+  @@index([companyId, membershipId])
+  @@index([workOrderId])
+}
+
+model Execution {
+  id           String          @id @default(uuid()) @db.Uuid
+  companyId    String          @db.Uuid
+  workOrderId  String          @db.Uuid
+  sequence     Int
+  status       ExecutionStatus @default(PENDING)
+  reopenReason String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime        @default(now())
+
+  workOrder    WorkOrder                @relation(fields: [workOrderId], references: [id])
+  participants ExecutionParticipant[]
+  items        ExecutionChecklistItem[]
+  notes        ExecutionNote[]
+  signature    Signature?
+  reviews      SignatureReview[]
+
+  @@unique([workOrderId, sequence])
+}
+
+model ExecutionParticipant {
+  id           String    @id @default(uuid()) @db.Uuid
+  executionId  String    @db.Uuid
+  membershipId String    @db.Uuid
+  isPrimary    Boolean   @default(false)
+  joinedAt     DateTime  @default(now())
+  leftAt       DateTime?
+
+  execution  Execution  @relation(fields: [executionId], references: [id])
+  membership Membership @relation(fields: [membershipId], references: [id])
+
+  @@index([executionId])
+  @@index([membershipId])
+}
+
+/// Snapshot of a checklist item taken when the execution is created.
+model ExecutionChecklistItem {
+  id          String            @id @default(uuid()) @db.Uuid
+  executionId String            @db.Uuid
+  position    Int
+  label       String
+  kind        ChecklistItemKind
+  required    Boolean
+  done        Boolean           @default(false)
+  value       String?
+  completedAt DateTime?
+  completedBy String?           @db.Uuid
+
+  execution Execution @relation(fields: [executionId], references: [id])
+
+  @@unique([executionId, position])
+}
+
+model ExecutionNote {
+  id           String   @id @default(uuid()) @db.Uuid
+  executionId  String   @db.Uuid
+  membershipId String   @db.Uuid
+  text         String
+  createdAt    DateTime @default(now())
+
+  execution Execution @relation(fields: [executionId], references: [id])
+
+  @@index([executionId])
+}
+
+model Signature {
+  id          String          @id @default(uuid()) @db.Uuid
+  executionId String          @unique @db.Uuid
+  status      SignatureStatus
+  signerName  String?
+  reason      String?
+  /// PNG captured on screen (small, validated by magic bytes and size).
+  image       Bytes?
+  capturedBy  String          @db.Uuid
+  capturedAt  DateTime        @default(now())
+
+  execution Execution @relation(fields: [executionId], references: [id])
+}
+
+model SignatureReview {
+  id           String         @id @default(uuid()) @db.Uuid
+  executionId  String         @db.Uuid
+  membershipId String         @db.Uuid
+  decision     ReviewDecision
+  note         String
+  createdAt    DateTime       @default(now())
+
+  execution Execution @relation(fields: [executionId], references: [id])
+
+  @@index([executionId])
 }

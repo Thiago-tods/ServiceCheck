@@ -5,6 +5,7 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ClientsModule } from './clients/clients.module';
+import { OrdersModule } from './orders/orders.module';
 import { PeopleModule } from './people/people.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { validateEnv } from './config/env.validation';
@@ -24,6 +25,7 @@ import { TenantGuard } from './tenancy/tenant.guard';
     ClientsModule,
     PeopleModule,
     CatalogModule,
+    OrdersModule,
     HealthModule,
   ],
   providers: [
