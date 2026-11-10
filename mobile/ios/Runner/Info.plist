@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Take photos of the work performed.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach existing photos to the work order.</string>
 </dict>
 </plist>
