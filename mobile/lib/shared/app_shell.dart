@@ -15,12 +15,7 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     return Scaffold(
-      body: Column(
-        children: [
-          const SyncBanner(),
-          Expanded(child: shell),
-        ],
-      ),
+      body: SyncBanner(child: shell),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
@@ -37,7 +32,8 @@ class AppShell extends ConsumerWidget {
 
 /// Always tells the truth about what is and is not on the server.
 class SyncBanner extends ConsumerWidget {
-  const SyncBanner({super.key});
+  const SyncBanner({super.key, required this.child});
+  final Widget child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -55,8 +51,11 @@ class SyncBanner extends ConsumerWidget {
       _ when issues > 0 => (Icons.warning_amber_rounded, l.syncIssues, scheme.error),
       _ => null,
     };
-    if (info == null) return const SizedBox.shrink();
-    return Material(
+    // The tree has the same shape with and without the banner, so a connection change never
+    // remounts the navigator below it (that would drop screens, drafts and focus).
+    // The banner's SafeArea covers the status bar; nested app bars read the same MediaQuery
+    // padding, so it is removed for them only while the banner is showing.
+    final Widget banner = info == null ? const SizedBox.shrink() : Material(
       color: scheme.surfaceContainerHighest,
       child: SafeArea(
         bottom: false,
@@ -75,6 +74,12 @@ class SyncBanner extends ConsumerWidget {
           ),
         ),
       ),
+    );
+    return Column(
+      children: [
+        banner,
+        Expanded(child: MediaQuery.removePadding(context: context, removeTop: info != null, child: child)),
+      ],
     );
   }
 }

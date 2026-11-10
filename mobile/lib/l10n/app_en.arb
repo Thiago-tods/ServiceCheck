@@ -101,5 +101,17 @@
   "stepSigned": "Signature captured",
   "stepAttach": "Attachments",
   "reopenedNotice": "This order was reopened. A new execution is waiting.",
-  "localState": "Saved on this device"
+  "localState": "Saved on this device",
+  "executionUnavailableTitle": "Execution not available",
+  "executionCancelled": "This order was cancelled on the server. The execution started on this device was rejected, and the details are kept in Sync issues.",
+  "executionUnavailable": "The server has no active execution for this order. Changes it refused are kept in Sync issues.",
+  "backToOrders": "Back to orders",
+  "serverErrorInvalid": "The server could not accept this change because the data is not valid.",
+  "serverErrorSession": "Your session is no longer valid. Sign in again.",
+  "serverErrorForbidden": "You are not allowed to perform this action.",
+  "serverErrorNotFound": "This item no longer exists on the server.",
+  "serverErrorConflict": "The order changed on the server and this change no longer applies.",
+  "serverErrorTooLarge": "The file is too large for the server.",
+  "serverDetail": "Server detail: {message}",
+  "@serverDetail": { "placeholders": { "message": { "type": "String" } } }
 }

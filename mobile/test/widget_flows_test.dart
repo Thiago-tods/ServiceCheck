@@ -64,19 +64,22 @@ Widget harness({
   AuthState? auth,
   Future<void> Function(String, String)? onLogin,
   Locale locale = const Locale('en'),
+  List<RouteBase> extraRoutes = const [],
+  SyncController Function()? sync,
 }) {
   final router = GoRouter(
     routes: [
       GoRoute(path: '/', builder: (_, _) => home),
       GoRoute(path: '/orders/:id', builder: (_, s) => OrderDetailPage(orderId: s.pathParameters['id']!)),
       GoRoute(path: '/orders/:id/execute', builder: (_, s) => ExecutionPage(orderId: s.pathParameters['id']!)),
+      ...extraRoutes,
     ],
   );
   return ProviderScope(
     overrides: [
       appDatabaseProvider.overrideWithValue(db),
       tokenStoreProvider.overrideWithValue(MemoryTokenStore()),
-      syncProvider.overrideWith(NoopSync.new),
+      syncProvider.overrideWith(sync ?? NoopSync.new),
       authProvider.overrideWith(() => FakeAuth(auth ?? AuthState(session: session, companyId: company), onLogin)),
     ],
     child: MaterialApp.router(

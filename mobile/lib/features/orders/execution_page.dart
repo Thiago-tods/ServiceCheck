@@ -42,9 +42,10 @@ class _ExecutionPageState extends ConsumerState<ExecutionPage> {
     final l = context.l10n;
     final view = ref.watch(orderViewProvider(widget.orderId));
     final exec = view?.execution;
-    if (view == null || exec == null) {
+    if (view == null) {
       return Scaffold(appBar: AppBar(), body: Center(child: Text(l.genericError)));
     }
+    if (exec == null) return _ExecutionUnavailable(view: view);
     final actions = ref.read(orderActionsProvider);
     final editable = exec.status == 'IN_PROGRESS';
     final me = ref.watch(authProvider).value?.membership;
@@ -315,11 +316,65 @@ class _SignatureCard extends ConsumerWidget {
   }
 
   Future<void> _open(BuildContext context, WidgetRef ref) async {
+    // Otherwise the note field (still focused after sending a note) takes focus back when the
+    // sheet closes and brings the keyboard up again.
+    FocusManager.instance.primaryFocus?.unfocus();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _SignatureSheet(view: view),
+    );
+  }
+}
+
+/// The server has no execution to show for this order (for example a locally started execution
+/// was rejected because the order was cancelled). Nothing local is presented as confirmed.
+class _ExecutionUnavailable extends ConsumerWidget {
+  const _ExecutionUnavailable({required this.view});
+  final OrderView view;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final hasIssues = ref.watch(syncIssuesProvider).isNotEmpty;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l.orderNumber(view.order.number), style: monoStyle(context, size: 17, weight: FontWeight.w600)),
+        leading: BackButton(onPressed: () => context.go('/orders')),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.report_gmailerrorred_outlined, size: 36, color: scheme.error),
+              const SizedBox(height: 12),
+              Text(l.executionUnavailableTitle, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(
+                view.status == 'CANCELLED' ? l.executionCancelled : l.executionUnavailable,
+                key: const Key('execution-unavailable-message'),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                key: const Key('back-to-orders'),
+                onPressed: () => context.go('/orders'),
+                child: Text(l.backToOrders),
+              ),
+              if (hasIssues)
+                TextButton(
+                  key: const Key('open-sync-issues'),
+                  onPressed: () => context.go('/settings/sync-issues'),
+                  child: Text(l.syncIssues),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

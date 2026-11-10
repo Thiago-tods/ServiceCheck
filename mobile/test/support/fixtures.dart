@@ -88,6 +88,7 @@ Future<void> addOp(
   String? orderId,
   String? operationId,
   String state = OpState.pending,
+  String? error,
 }) async {
   final id = operationId ?? 'op-${DateTime.now().microsecondsSinceEpoch}-${payload.hashCode}';
   await db.enqueue(
@@ -97,7 +98,7 @@ Future<void> addOp(
     type: type,
     payload: payload,
   );
-  if (state != OpState.pending) await db.setOpState(id, state);
+  if (state != OpState.pending) await db.setOpState(id, state, error: error);
 }
 
 String prettyJson(Object? o) => const JsonEncoder.withIndent('  ').convert(o);

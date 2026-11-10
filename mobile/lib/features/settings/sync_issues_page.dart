@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/db/app_database.dart';
 import '../../core/l10n.dart';
+import '../../core/server_error.dart';
 import '../../core/theme/app_theme.dart';
 import '../orders/order_actions.dart';
 import '../orders/orders_providers.dart';
@@ -36,17 +35,6 @@ class SyncIssuesPage extends ConsumerWidget {
   }
 }
 
-String _message(String? raw) {
-  if (raw == null) return '';
-  try {
-    final decoded = jsonDecode(raw);
-    if (decoded is Map && decoded['message'] != null) return '${decoded['message']}';
-  } on FormatException {
-    // plain text error
-  }
-  return raw;
-}
-
 class _IssueCard extends ConsumerWidget {
   const _IssueCard({required this.op});
   final OutboxOp op;
@@ -55,6 +43,8 @@ class _IssueCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final conflict = op.state == OpState.conflict;
+    final error = ServerError.parse(op.lastError);
+    final detail = error.message;
     final scheme = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
@@ -69,10 +59,13 @@ class _IssueCard extends ConsumerWidget {
               const Spacer(),
               Text(op.type, style: monoStyle(context, size: 11.5)),
             ]),
-            if (_message(op.lastError).isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(_message(op.lastError)),
-            ],
+            const SizedBox(height: 8),
+            Text(error.describe(l)),
+            if (detail != null && detail.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(l.serverDetail(detail), style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+              ),
             const SizedBox(height: 4),
             Text(op.operationId, style: monoStyle(context, size: 11).copyWith(color: scheme.onSurfaceVariant)),
             Row(

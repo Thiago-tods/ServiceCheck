@@ -97,5 +97,16 @@
   "stepSigned": "Assinatura capturada",
   "stepAttach": "Anexos",
   "reopenedNotice": "Esta ordem foi reaberta. Há uma nova execução aguardando.",
-  "localState": "Salvo neste dispositivo"
+  "localState": "Salvo neste dispositivo",
+  "executionUnavailableTitle": "Execução indisponível",
+  "executionCancelled": "Esta ordem foi cancelada no servidor. A execução iniciada neste aparelho foi rejeitada e os detalhes ficam em Problemas de sincronização.",
+  "executionUnavailable": "O servidor não tem execução ativa para esta ordem. As alterações recusadas ficam em Problemas de sincronização.",
+  "backToOrders": "Voltar às ordens",
+  "serverErrorInvalid": "O servidor não aceitou esta alteração porque os dados não são válidos.",
+  "serverErrorSession": "Sua sessão não é mais válida. Entre novamente.",
+  "serverErrorForbidden": "Você não tem permissão para esta ação.",
+  "serverErrorNotFound": "Este item não existe mais no servidor.",
+  "serverErrorConflict": "A ordem mudou no servidor e esta alteração não vale mais.",
+  "serverErrorTooLarge": "O arquivo é grande demais para o servidor.",
+  "serverDetail": "Detalhe do servidor: {message}"
 }
