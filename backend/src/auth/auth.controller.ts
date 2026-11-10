@@ -1,19 +1,25 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { CurrentUser, Public } from '../common/decorators';
 import type { AuthUser } from '../common/request-context';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto, RefreshDto, RegisterDto } from './dto';
+
+/** Credential endpoints get a much tighter limit than the rest of the API. */
+const STRICT = Throttle({ default: { limit: 10, ttl: 60_000 } });
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @STRICT
   @Public()
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
   }
 
+  @STRICT
   @Public()
   @HttpCode(200)
   @Post('login')
@@ -21,6 +27,7 @@ export class AuthController {
     return this.auth.login(dto);
   }
 
+  @STRICT
   @Public()
   @HttpCode(200)
   @Post('refresh')

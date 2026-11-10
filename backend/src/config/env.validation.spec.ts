@@ -14,6 +14,17 @@ describe('validateEnv', () => {
     expect(env.REFRESH_TTL_DAYS).toBe(30);
   });
 
+  it('parses boolean flags from strings without treating "false" as true', () => {
+    expect(validateEnv({ ...base, RATE_LIMIT_ENABLED: 'false' }).RATE_LIMIT_ENABLED).toBe(false);
+    expect(validateEnv({ ...base, RATE_LIMIT_ENABLED: 'true' }).RATE_LIMIT_ENABLED).toBe(true);
+    expect(validateEnv(base).RATE_LIMIT_ENABLED).toBe(true);
+  });
+
+  it('requires S3 settings only when the S3 driver is selected', () => {
+    expect(() => validateEnv({ ...base, STORAGE_DRIVER: 's3' })).toThrow(/S3_BUCKET/);
+    expect(() => validateEnv({ ...base, STORAGE_DRIVER: 'local' })).not.toThrow();
+  });
+
   it('rejects missing DATABASE_URL', () => {
     expect(() => validateEnv({ ...base, DATABASE_URL: undefined })).toThrow(/DATABASE_URL/);
   });

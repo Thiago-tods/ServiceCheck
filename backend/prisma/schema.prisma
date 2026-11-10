@@ -346,6 +346,7 @@ model Execution {
   items        ExecutionChecklistItem[]
   notes        ExecutionNote[]
   signature    Signature?
+  attachments  Attachment[]
   reviews      SignatureReview[]
 
   @@unique([workOrderId, sequence])
@@ -457,4 +458,68 @@ model Notification {
   createdAt    DateTime  @default(now())
 
   @@index([companyId, membershipId, readAt])
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum ReportStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+/// Photos and documents of an execution. The file lives in object storage; this row is the index.
+/// `id` may be chosen by the device so that retried uploads are idempotent.
+model Attachment {
+  id              String   @id @default(uuid()) @db.Uuid
+  companyId       String   @db.Uuid
+  executionId     String   @db.Uuid
+  checklistItemId String?  @db.Uuid
+  uploadedBy      String   @db.Uuid
+  filename        String
+  contentType     String
+  size            Int
+  sha256          String
+  storageKey      String
+  createdAt       DateTime @default(now())
+
+  execution Execution @relation(fields: [executionId], references: [id])
+
+  @@index([executionId])
+}
+
+model Report {
+  id          String       @id @default(uuid()) @db.Uuid
+  companyId   String       @db.Uuid
+  workOrderId String       @db.Uuid
+  status      ReportStatus @default(PENDING)
+  storageKey  String?
+  error       String?
+  requestedBy String       @db.Uuid
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  @@index([companyId, workOrderId])
+}
+
+/// Database-backed queue (no Redis needed): workers claim rows with FOR UPDATE SKIP LOCKED.
+model Job {
+  id          String    @id @default(uuid()) @db.Uuid
+  type        String
+  payload     Json
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  lockedAt    DateTime?
+  maxAttempts Int       @default(3)
+  runAt       DateTime  @default(now())
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  finishedAt  DateTime?
+
+  @@index([status, runAt])
 }

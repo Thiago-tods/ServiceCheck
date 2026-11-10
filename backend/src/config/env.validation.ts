@@ -1,12 +1,34 @@
 import 'reflect-metadata';
-import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, IsString, Max, Min, MinLength, validateSync } from 'class-validator';
+import { plainToInstance, Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MinLength,
+  ValidateIf,
+  validateSync,
+} from 'class-validator';
 
 export enum NodeEnv {
   Development = 'development',
   Test = 'test',
   Production = 'production',
 }
+
+export enum StorageDriverName {
+  Local = 'local',
+  S3 = 's3',
+}
+
+// Read the raw value: implicit conversion would turn the string 'false' into true.
+const toBool = Transform(({ obj, key }: { obj: Record<string, unknown>; key: string }) => {
+  const raw = obj[key];
+  return typeof raw === 'string' ? raw.toLowerCase() === 'true' : raw;
+});
 
 export class EnvironmentVariables {
   @IsEnum(NodeEnv)
@@ -32,6 +54,56 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   REFRESH_TTL_DAYS: number = 30;
+
+  @IsEnum(StorageDriverName)
+  STORAGE_DRIVER: StorageDriverName = StorageDriverName.Local;
+
+  @IsString()
+  STORAGE_LOCAL_DIR: string = './storage';
+
+  @ValidateIf((o: EnvironmentVariables) => o.STORAGE_DRIVER === StorageDriverName.S3)
+  @IsString()
+  @MinLength(1)
+  S3_BUCKET?: string;
+
+  @ValidateIf((o: EnvironmentVariables) => o.STORAGE_DRIVER === StorageDriverName.S3)
+  @IsString()
+  @MinLength(1)
+  S3_ACCESS_KEY_ID?: string;
+
+  @ValidateIf((o: EnvironmentVariables) => o.STORAGE_DRIVER === StorageDriverName.S3)
+  @IsString()
+  @MinLength(1)
+  S3_SECRET_ACCESS_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  S3_REGION?: string;
+
+  /** Custom endpoint for S3-compatible services (MinIO, R2, Backblaze...). */
+  @IsOptional()
+  @IsString()
+  S3_ENDPOINT?: string;
+
+  @IsOptional()
+  @toBool
+  @IsBoolean()
+  S3_FORCE_PATH_STYLE?: boolean;
+
+  @IsOptional()
+  @toBool
+  @IsBoolean()
+  RATE_LIMIT_ENABLED: boolean = true;
+
+  /** Background worker polling. Tests disable it and drive the queue explicitly. */
+  @IsOptional()
+  @toBool
+  @IsBoolean()
+  JOBS_WORKER_ENABLED: boolean = true;
+
+  @IsOptional()
+  @IsString()
+  SENTRY_DSN?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

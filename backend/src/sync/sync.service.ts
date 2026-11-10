@@ -77,9 +77,10 @@ export class SyncService {
     try {
       return await this.prisma.transactional(async (tx) => {
         const inserted = await tx.$executeRaw`
-          INSERT INTO "ProcessedOperation" ("id","companyId","membershipId","type","status","payload")
+          INSERT INTO "ProcessedOperation" ("id","companyId","membershipId","type","status","payload","createdAt")
           VALUES (${op.operationId}::uuid, ${t.companyId}::uuid, ${t.membershipId}::uuid, ${op.type},
-                  'APPLIED'::"OperationStatus", ${JSON.stringify(op.payload)}::jsonb)
+                  'APPLIED'::"OperationStatus", ${JSON.stringify(op.payload)}::jsonb,
+                  (now() AT TIME ZONE 'UTC'))
           ON CONFLICT ("id") DO NOTHING`;
         if (inserted === 0) return this.duplicate(tx, t, op.operationId);
 

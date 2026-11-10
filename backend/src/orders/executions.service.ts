@@ -97,7 +97,7 @@ export class ExecutionsService {
   }
 
   /** Loads an IN_PROGRESS execution and proves the caller is an active participant. */
-  private async participantContext(tx: Tx, t: TenantContext, executionId: string) {
+  async participantContext(tx: Tx, t: TenantContext, executionId: string) {
     const execution = await tx.execution.findFirst({
       where: { id: executionId, companyId: t.companyId },
       include: { participants: { where: { leftAt: null } } },

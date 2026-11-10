@@ -14,6 +14,17 @@ const ORDER_DETAIL = {
     orderBy: { sequence: 'asc' },
     include: {
       participants: true,
+      attachments: {
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          checklistItemId: true,
+          filename: true,
+          contentType: true,
+          size: true,
+          createdAt: true,
+        },
+      },
       items: { orderBy: { position: 'asc' } },
       notes: { orderBy: { createdAt: 'asc' } },
       reviews: { orderBy: { createdAt: 'asc' } },
@@ -198,6 +209,16 @@ export class OrdersService {
       nextCursor: orders.length ? orders[orders.length - 1].updatedAt : (since ?? null),
     };
   }
+  /** Throws 404 unless the order exists in the caller's company and is visible to their role. */
+  async assertVisible(t: TenantContext, id: string): Promise<{ id: string; number: number }> {
+    const order = await this.prisma.workOrder.findFirst({
+      where: { id, companyId: t.companyId, ...this.visibility(t) },
+      select: { id: true, number: true },
+    });
+    if (!order) throw new NotFoundException('Work order not found');
+    return order;
+  }
+
   history(t: TenantContext, id: string, limit: number) {
     return this.prisma.auditLog.findMany({
       where: { companyId: t.companyId, entityType: 'WorkOrder', entityId: id },
