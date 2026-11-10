@@ -32,12 +32,14 @@ npm run start:dev
 Verificação completa:
 
 ```powershell
-npx prettier --check 'src/**/*.ts' 'test/**/*.ts'
-npx eslint '{src,test}/**/*.ts'
+npm run format        # verifica formatação (não altera arquivos); 'npm run format:fix' corrige
+npm run lint          # verifica lint (não altera arquivos); 'npm run lint:fix' corrige
 npm run build
 npm test              # unitários
 npm run test:e2e      # integração com PostgreSQL real (usa servicecheck_test)
 ```
+
+O Helmet está ativo. `trust proxy` fica desligado de propósito: sem um proxy reverso confiável, confiar em `X-Forwarded-For` deixaria qualquer cliente falsificar o IP e burlar o rate limit. Ao colocar a API atrás de um proxy conhecido, habilite-o com o número exato de saltos.
 
 Os testes e2e aplicam as migrações e esvaziam as tabelas do banco de teste a cada teste.
 Variáveis de teste ficam em `backend/test/env.ts`; na CI, `DATABASE_URL` vem do ambiente.

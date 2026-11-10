@@ -33,6 +33,13 @@ describe('Health (e2e)', () => {
     await request(httpServer()).get('/api/v1/health/ready').expect(503);
   });
 
+  it('sends security headers and does not advertise the framework', async () => {
+    const res = await request(httpServer()).get('/api/v1/health').expect(200);
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['x-frame-options']).toBeDefined();
+    expect(res.headers['x-powered-by']).toBeUndefined();
+  });
+
   it('is not exposed outside the versioned prefix', async () => {
     await request(httpServer()).get('/health').expect(404);
   });

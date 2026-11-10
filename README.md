@@ -80,7 +80,7 @@ Ainda **não** validado ou fora do escopo:
 - Execução em aparelho/emulador e iOS (sem build iOS nesta máquina).
 - Driver S3 e Sentry contra serviços reais (testados apenas com simulações / desligados sem DSN).
 - Push nativo, criação e atribuição de ordens pelo app (feitas via API), revisão de assinatura por membro não-Admin no app.
-- Rate limiting atrás de proxy exige configurar `trust proxy`.
+- Rate limiting atrás de proxy reverso exige habilitar `trust proxy` (desligado por padrão, de propósito).
 
 ## Licença
 

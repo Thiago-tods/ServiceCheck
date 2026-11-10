@@ -38,8 +38,8 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npx prisma generate
-      - run: npx prettier --check "src/**/*.ts" "test/**/*.ts"
-      - run: npx eslint "{src,test}/**/*.ts"
+      - run: npm run format
+      - run: npm run lint
       - run: npm run build
       - run: npm test
       - run: npm run test:e2e

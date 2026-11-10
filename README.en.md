@@ -82,7 +82,7 @@ Verified by automated tests: backend (unit and integration against real PostgreS
 - Running on a device/emulator, and iOS (no iOS build on this machine).
 - S3 driver and Sentry against real services (tested with fakes / disabled without a DSN).
 - Native push, creating and assigning orders from the app (done through the API), signature review by non-admin members in the app.
-- Rate limiting behind a reverse proxy needs `trust proxy` configured.
+- Rate limiting behind a reverse proxy requires enabling `trust proxy` (off by default, on purpose).
 
 ## License
 
