@@ -33,7 +33,7 @@ export class ExecutionsService {
   }
 
   /** Starts (or resumes a PENDING, e.g. reopened) execution for the assigned technicians. */
-  async start(t: TenantContext, actor: string, orderId: string) {
+  async start(t: TenantContext, actor: string, orderId: string, clientExecutionId?: string) {
     return this.prisma.transactional(async (tx) => {
       const order = await lockOrder(tx, t.companyId, orderId);
       const assignments = await tx.workOrderAssignment.findMany({
@@ -47,6 +47,12 @@ export class ExecutionsService {
       let execution = await tx.execution.findFirst({
         where: { workOrderId: orderId, status: 'PENDING' },
       });
+      if (execution && clientExecutionId && execution.id !== clientExecutionId) {
+        // The device started offline with its own id before learning about the reopening.
+        throw new ConflictException(
+          'A reopened execution is pending for this order; synchronise and use its id',
+        );
+      }
       if (!execution) {
         const last = await tx.execution.aggregate({
           where: { workOrderId: orderId },
@@ -55,6 +61,8 @@ export class ExecutionsService {
         const snapshot = order.serviceSnapshot as unknown as ServiceSnapshot;
         execution = await tx.execution.create({
           data: {
+            // Offline devices choose the id so later operations can reference it before sync.
+            id: clientExecutionId,
             companyId: t.companyId,
             workOrderId: orderId,
             sequence: (last._max.sequence ?? 0) + 1,
@@ -115,14 +123,19 @@ export class ExecutionsService {
     t: TenantContext,
     actor: string,
     executionId: string,
-    itemId: string,
+    /** Item id, or its position in the checklist (what an offline device knows before syncing). */
+    itemRef: string | number,
     dto: UpdateItemDto,
   ) {
     return this.prisma.transactional(async (tx) => {
       const { execution } = await this.participantContext(tx, t, executionId);
       const item = await tx.executionChecklistItem.findFirst({
-        where: { id: itemId, executionId },
+        where:
+          typeof itemRef === 'number'
+            ? { position: itemRef, executionId }
+            : { id: itemRef, executionId },
       });
+      const itemId = item?.id ?? '';
       if (!item) throw new NotFoundException('Checklist item not found');
 
       if (

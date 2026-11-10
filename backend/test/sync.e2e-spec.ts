@@ -145,6 +145,71 @@ describe('Sync, notifications and dashboard (e2e, real PostgreSQL)', () => {
     expect(await t.prisma.execution.count({ where: { workOrderId: orderId } })).toBe(1);
   });
 
+  it('supports a fully offline chain: device-chosen execution id and checklist positions', async () => {
+    const w = await setup();
+    const orderId = await scheduledOrder(w);
+    const executionId = randomUUID(); // generated on the device, before any server contact
+    const batch = [
+      op('EXECUTION_START', { orderId, executionId }),
+      op('ITEM_UPDATE', { executionId, itemPosition: 0, done: true }),
+      op('ITEM_UPDATE', { executionId, itemPosition: 1, value: 'texto offline' }),
+      op('NOTE_ADD', { executionId, text: 'nota offline' }),
+      op('SIGNATURE_SET', { executionId, status: 'ABSENT', reason: 'Ninguém no local' }),
+      op('EXECUTION_FINISH', { executionId }),
+    ];
+    const { results } = await push(w, w.tech, batch);
+    expect(results.map((r) => r.outcome)).toEqual(Array(6).fill('APPLIED'));
+    expect(results[0].response).toMatchObject({ executionId });
+    expect((await t.prisma.workOrder.findUniqueOrThrow({ where: { id: orderId } })).status).toBe(
+      'SIGNATURE_REVIEW',
+    );
+    const items = await t.prisma.executionChecklistItem.findMany({
+      where: { executionId },
+      orderBy: { position: 'asc' },
+    });
+    expect(items.map((i) => i.done)).toEqual([true, true]);
+    expect(items[1].value).toBe('texto offline');
+  });
+
+  it('requires an item id or position, and rejects a stale device-chosen execution id', async () => {
+    const w = await setup();
+    const orderId = await scheduledOrder(w);
+    const executionId = randomUUID();
+    await push(w, w.tech, [op('EXECUTION_START', { orderId, executionId })]);
+    const bad = await push(w, w.tech, [op('ITEM_UPDATE', { executionId, done: true })]);
+    expect(bad.results[0].outcome).toBe('REJECTED');
+    const missing = await push(w, w.tech, [
+      op('ITEM_UPDATE', { executionId, itemPosition: 99, done: true }),
+    ]);
+    expect(missing.results[0].outcome).toBe('REJECTED');
+
+    // Reopen -> PENDING execution exists; an offline start with its own id must conflict.
+    const items = await t.prisma.executionChecklistItem.findMany({ where: { executionId } });
+    await push(w, w.tech, [
+      op('ITEM_UPDATE', { executionId, itemId: items.find((i) => i.required)!.id, done: true }),
+      op('SIGNATURE_SET', {
+        executionId,
+        status: 'SIGNED',
+        signerName: 'Ana',
+        imagePngBase64: PNG,
+      }),
+      op('EXECUTION_FINISH', { executionId }),
+    ]);
+    await api(t, w.admin, w.companyId).post(`/work-orders/${orderId}/approve`, {}).expect(201);
+    await api(t, w.admin, w.companyId)
+      .post(`/work-orders/${orderId}/reopen`, { reason: 'Refazer o acabamento' })
+      .expect(201);
+    const stale = await push(w, w.tech, [
+      op('EXECUTION_START', { orderId, executionId: randomUUID() }),
+    ]);
+    expect(stale.results[0].outcome).toBe('CONFLICT');
+    const pending = await t.prisma.execution.findFirstOrThrow({
+      where: { workOrderId: orderId, status: 'PENDING' },
+    });
+    const ok = await push(w, w.tech, [op('EXECUTION_START', { orderId, executionId: pending.id })]);
+    expect(ok.results[0].outcome).toBe('APPLIED');
+  });
+
   it('replaying EXECUTION_START returns the original result and never starts twice', async () => {
     const w = await setup();
     const orderId = await scheduledOrder(w);

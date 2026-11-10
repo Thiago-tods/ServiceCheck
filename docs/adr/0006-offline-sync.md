@@ -23,3 +23,6 @@ Notificações no app (tabela `Notification`), geradas no mesmo funil que grava 
 ## Dashboard
 
 `GET /dashboard` devolve contagens por status, agendadas para hoje, atrasadas, sem técnico e pendências (revisão de assinatura e aprovação). Para Professionals, restringe-se às próprias ordens.
+## Encadeamento totalmente offline
+
+O aplicativo escolhe o `executionId` (UUID v4) em `EXECUTION_START` e referencia itens do checklist por `itemPosition` (o snapshot do checklist já está na ordem sincronizada). Assim, iniciar, preencher, assinar e finalizar podem ser enfileirados sem contato prévio com o servidor. Se uma execução reaberta (`PENDING`) já existir com outro id, o início responde `CONFLICT` e o app deve sincronizar e usar o id existente.

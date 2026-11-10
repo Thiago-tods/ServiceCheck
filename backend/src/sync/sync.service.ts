@@ -1,7 +1,17 @@
 import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
 import { OperationStatus, Prisma } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
-import { IsString, IsUUID, MaxLength, MinLength, validate } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+  MinLength,
+  validate,
+  ValidateIf,
+} from 'class-validator';
 import { TenantContext } from '../common/request-context';
 import { ExecutionsService } from '../orders/executions.service';
 import { CaptureSignatureDto, UpdateItemDto } from '../orders/orders.dto';
@@ -15,9 +25,18 @@ class OrderRef {
 class ExecRef {
   @IsUUID() executionId!: string;
 }
+class StartPayload extends OrderRef {
+  /** Chosen by the device so that offline operations can reference the execution before it exists. */
+  @IsOptional() @IsUUID('4') executionId?: string;
+}
 class ItemUpdatePayload extends UpdateItemDto {
   @IsUUID() executionId!: string;
-  @IsUUID() itemId!: string;
+  /** Either the item id (known after a pull) or its position in the checklist snapshot. */
+  @ValidateIf((o: ItemUpdatePayload) => o.itemPosition === undefined) @IsUUID() itemId?: string;
+  @ValidateIf((o: ItemUpdatePayload) => o.itemId === undefined)
+  @IsInt()
+  @Min(0)
+  itemPosition?: number;
 }
 class NotePayload extends ExecRef {
   @IsString() @MinLength(1) @MaxLength(2000) text!: string;
@@ -165,16 +184,22 @@ export class SyncService {
   private async apply(t: TenantContext, actor: string, op: SyncOperationDto): Promise<unknown> {
     switch (op.type) {
       case SyncOperationType.EXECUTION_START: {
-        const p = await parse(OrderRef, op.payload);
-        const execution = await this.executions.start(t, actor, p.orderId);
+        const p = await parse(StartPayload, op.payload);
+        const execution = await this.executions.start(t, actor, p.orderId, p.executionId);
         return { executionId: execution.id, sequence: execution.sequence };
       }
       case SyncOperationType.ITEM_UPDATE: {
         const p = await parse(ItemUpdatePayload, op.payload);
-        const item = await this.executions.updateItem(t, actor, p.executionId, p.itemId, {
-          done: p.done,
-          value: p.value,
-        });
+        const item = await this.executions.updateItem(
+          t,
+          actor,
+          p.executionId,
+          (p.itemId ?? p.itemPosition) as string | number,
+          {
+            done: p.done,
+            value: p.value,
+          },
+        );
         return { itemId: item.id, done: item.done };
       }
       case SyncOperationType.NOTE_ADD: {
