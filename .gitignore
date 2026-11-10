@@ -1,0 +1,42 @@
+﻿# Claude Code (arquivos locais)
+.claude/settings.local.json
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Segredos e ambiente
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Backend (NestJS)
+backend/node_modules/
+backend/dist/
+backend/coverage/
+backend/*.log
+
+# Mobile (Flutter/Dart)
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/.packages
+mobile/pubspec.lock.bak
+mobile/android/key.properties
+mobile/android/**/*.jks
+mobile/ios/Pods/
+*.g.dart.bak
+
+# Logs
+*.log
+npm-debug.log*
