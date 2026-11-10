@@ -137,6 +137,21 @@ describe('Attachments, reports and jobs (e2e, real PostgreSQL)', () => {
     await api(t, w.tech, w.companyId).post(`/executions/${exec.id}/finish`).expect(201);
   });
 
+  it('accepts a checklist item position instead of its id (offline devices)', async () => {
+    const w = await setupWorld(t, [{ label: 'Foto', kind: 'PHOTO', required: true }]);
+    const exec = await startOrder(t, w, await scheduledOrder(t, w));
+    await upload(w, w.tech, exec.id, PNG, 'p.png', 'image/png', {
+      checklistItemPosition: '0',
+    }).expect(201);
+    const item = await t.prisma.executionChecklistItem.findFirstOrThrow({
+      where: { executionId: exec.id, position: 0 },
+    });
+    expect(item.done).toBe(true);
+    await upload(w, w.tech, exec.id, PNG, 'p.png', 'image/png', {
+      checklistItemPosition: '9',
+    }).expect(404);
+  });
+
   async function finishedOrder(w: World) {
     const orderId = await scheduledOrder(t, w, 'Trocar tomada da sala', w.m.tech, 14);
     const exec = await startOrder(t, w, orderId);

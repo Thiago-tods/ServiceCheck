@@ -11,7 +11,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
-import { IsOptional, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 import { CurrentTenant, CurrentUser, TenantScoped } from '../common/decorators';
 import type { AuthUser, TenantContext } from '../common/request-context';
 import {
@@ -23,6 +24,8 @@ import {
 class UploadFields {
   @IsOptional() @IsUUID('4') id?: string;
   @IsOptional() @IsUUID() checklistItemId?: string;
+  /** Alternative to checklistItemId for offline devices; multipart fields arrive as strings. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) checklistItemPosition?: number;
 }
 
 @TenantScoped()

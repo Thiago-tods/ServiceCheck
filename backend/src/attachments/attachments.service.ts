@@ -41,7 +41,7 @@ export class AttachmentsService {
     actor: string,
     executionId: string,
     file: UploadedFile | undefined,
-    opts: { id?: string; checklistItemId?: string },
+    opts: { id?: string; checklistItemId?: string; checklistItemPosition?: number },
   ) {
     if (!file) throw new BadRequestException('file is required');
     if (file.size > MAX_ATTACHMENT_BYTES) throw new PayloadTooLargeException('File exceeds 10 MB');
@@ -65,12 +65,16 @@ export class AttachmentsService {
       }
 
       let itemKind: string | undefined;
-      if (opts.checklistItemId) {
+      let checklistItemId: string | undefined;
+      if (opts.checklistItemId || opts.checklistItemPosition !== undefined) {
         const item = await tx.executionChecklistItem.findFirst({
-          where: { id: opts.checklistItemId, executionId },
+          where: opts.checklistItemId
+            ? { id: opts.checklistItemId, executionId }
+            : { position: opts.checklistItemPosition, executionId },
         });
         if (!item) throw new NotFoundException('Checklist item not found');
         itemKind = item.kind;
+        checklistItemId = item.id;
       }
 
       const storageKey = `attachments/${t.companyId}/${executionId}/${id}`;
@@ -80,7 +84,7 @@ export class AttachmentsService {
           id,
           companyId: t.companyId,
           executionId,
-          checklistItemId: opts.checklistItemId,
+          checklistItemId,
           uploadedBy: t.membershipId,
           filename: sanitizeFilename(file.originalname),
           contentType: file.mimetype,
@@ -89,9 +93,9 @@ export class AttachmentsService {
           storageKey,
         },
       });
-      if (opts.checklistItemId && itemKind === 'PHOTO' && file.mimetype.startsWith('image/')) {
+      if (checklistItemId && itemKind === 'PHOTO' && file.mimetype.startsWith('image/')) {
         await tx.executionChecklistItem.update({
-          where: { id: opts.checklistItemId },
+          where: { id: checklistItemId },
           data: { done: true, completedAt: new Date(), completedBy: t.membershipId },
         });
       }

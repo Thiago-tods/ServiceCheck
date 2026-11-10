@@ -81,7 +81,7 @@ export class AuthService {
 
   async me(userId: string): Promise<{
     user: PublicUser;
-    memberships: { companyId: string; companyName: string; role: string }[];
+    memberships: { membershipId: string; companyId: string; companyName: string; role: string }[];
   }> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -90,6 +90,7 @@ export class AuthService {
     return {
       user: toPublic(user),
       memberships: user.memberships.map((m) => ({
+        membershipId: m.id,
         companyId: m.companyId,
         companyName: m.company.name,
         role: m.role,
