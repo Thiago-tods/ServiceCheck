@@ -84,7 +84,19 @@ export class SyncService {
    */
   async push(t: TenantContext, actor: string, operations: SyncOperationDto[]) {
     const results: OperationResult[] = [];
-    for (const op of operations) results.push(await this.processOne(t, actor, op));
+    // Operations depend on the ones before them (start -> fill -> sign -> finish). After an
+    // unexpected failure the rest of the batch is returned as retryable without being run,
+    // so the device can resend everything in the same order.
+    let halted = false;
+    for (const op of operations) {
+      if (halted) {
+        results.push({ operationId: op.operationId, outcome: 'ERROR', retryable: true });
+        continue;
+      }
+      const result = await this.processOne(t, actor, op);
+      results.push(result);
+      if (result.outcome === 'ERROR') halted = true;
+    }
     return { results, serverTime: new Date() };
   }
 

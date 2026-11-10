@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { ExecutionsService } from '../src/orders/executions.service';
 import {
   addMember,
   api,
@@ -169,6 +170,29 @@ describe('Sync, notifications and dashboard (e2e, real PostgreSQL)', () => {
     });
     expect(items.map((i) => i.done)).toEqual([true, true]);
     expect(items[1].value).toBe('texto offline');
+  });
+
+  it('stops the batch at an unexpected failure so dependent operations never run out of order', async () => {
+    const w = await setup();
+    const orderId = await scheduledOrder(w);
+    const executionId = randomUUID();
+    const spy = jest
+      .spyOn(ExecutionsService.prototype, 'start')
+      .mockRejectedValueOnce(new Error('database exploded'));
+    const batch = [
+      op('EXECUTION_START', { orderId, executionId }),
+      op('ITEM_UPDATE', { executionId, itemPosition: 0, done: true }),
+    ];
+    const first = await push(w, w.tech, batch);
+    spy.mockRestore();
+    expect(first.results.map((r) => [r.outcome, r.retryable])).toEqual([
+      ['ERROR', true],
+      ['ERROR', true],
+    ]);
+    // Nothing was recorded as processed, so a retry runs the whole chain normally.
+    expect(await t.prisma.processedOperation.count()).toBe(0);
+    const retry = await push(w, w.tech, batch);
+    expect(retry.results.map((r) => r.outcome)).toEqual(['APPLIED', 'APPLIED']);
   });
 
   it('requires an item id or position, and rejects a stale device-chosen execution id', async () => {
