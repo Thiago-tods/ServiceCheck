@@ -97,10 +97,12 @@ The backend is more complete than the app. Today the app covers the technician's
 
 ## Project status and known limits
 
-**Automated tests.** The numbers below come from running the tests in this repository's working tree. The last verification on a **clean clone** (dependencies installed from scratch) happened before the current JWT secret policy and demo seed, and passed with backend 34 unit and 71 integration tests, 51 Flutter tests and the debug APK; **it has not been repeated with the current code yet**.
+**Tests run and passing** (current code, in the working tree):
 
-- Backend: 110 unit tests (Jest, including the environment validation and the JWT secret policy), 153 tests of the demo-data script (`node:test`) and 71 integration tests against real PostgreSQL, including concurrency.
-- Flutter: 51 tests and `flutter analyze` with no findings. The debug APK builds.
+- Backend: 110 unit tests (Jest, including the environment validation and the JWT secret policy), 153 tests of the demo-data script (`node:test`) and 71 integration tests against real PostgreSQL (test database), including concurrency. Prettier, ESLint and the build finished without errors.
+- Flutter: 51 tests and `flutter analyze` with no issues.
+
+**Clean-copy validation.** In a copy of the `backend` folder (without `node_modules`, `dist` or `.env`), `npm ci`, Prisma client generation, Prettier, ESLint, the build and the tests above (110 unit, 153 seed and 71 integration) passed. It was a folder copy, **not a real clone** of the repository.
 
 **Manual validation on the Android emulator** (Pixel_10, Android 37) against a local backend, through the app UI: login, logout (the session ends and the refresh-token family is revoked), automatic renewal of an expired access token, return to login when the refresh token is invalid, offline execution, sync on reconnection, handling of an operation rejected by the server, camera (online and offline), on-screen signature, finishing with validations, and approval by the Owner.
 
@@ -108,6 +110,8 @@ A few cases were verified by **calling the API directly, not through the UI**: a
 
 **Not yet validated:**
 
+- Installation from a real clone of the repository (backend and Flutter app, following this documentation).
+- Building the debug APK with the current code (not repeated at this stage; the app was not tested in a clean copy either).
 - A physical device and iOS (the app has never been built for iOS).
 - The S3 driver and Sentry against real services (tested with fakes only; Sentry stays off without a DSN).
 - **GitHub Actions:** the workflows exist in `.github/workflows` but have not been run on GitHub yet.

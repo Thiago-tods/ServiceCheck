@@ -1,4 +1,5 @@
 # Claude Code (arquivos locais)
+.claude/settings.json
 .claude/settings.local.json
 
 # Sistema operacional

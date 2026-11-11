@@ -95,10 +95,12 @@ O backend é mais completo que o aplicativo. Hoje o app cobre o trabalho do téc
 
 ## Estado do projeto e limites conhecidos
 
-**Testes automatizados.** Os números abaixo vêm de rodar os testes na árvore de trabalho deste repositório. A última verificação em **clone limpo** (que instalou as dependências do zero) aconteceu antes da política de segredo JWT e do seed atuais e passou com backend 34 unitários e 71 de integração, Flutter 51 testes e o APK debug; **ela ainda não foi repetida com o código atual**.
+**Testes executados e aprovados** (código atual, na árvore de trabalho):
 
-- Backend: 110 testes unitários (Jest, incluindo a validação do ambiente e a política do segredo JWT), 153 testes do script de dados de demonstração (`node:test`) e 71 de integração contra PostgreSQL real, incluindo concorrência.
-- Flutter: 51 testes e `flutter analyze` sem avisos. O APK debug compila.
+- Backend: 110 testes unitários (Jest, incluindo a validação do ambiente e a política do segredo JWT), 153 testes do script de dados de demonstração (`node:test`) e 71 de integração contra PostgreSQL real (banco de teste), incluindo concorrência. Prettier, ESLint e build concluídos sem erros.
+- Flutter: 51 testes e `flutter analyze` sem problemas.
+
+**Validação em cópia limpa.** Em uma cópia da pasta `backend` (sem `node_modules`, `dist` nem `.env`), `npm ci`, geração do cliente Prisma, Prettier, ESLint, build e os testes acima (110 unitários, 153 do seed e 71 de integração) passaram. Foi uma cópia de pasta, **não um clone real** do repositório.
 
 **Validação manual no emulador Android** (Pixel_10, Android 37) contra um backend local, pela interface do app: login, logout (a sessão termina e a família do refresh token é revogada), renovação automática do token de acesso expirado, volta ao login quando o refresh é inválido, execução offline, sincronização ao reconectar, tratamento de operação rejeitada pelo servidor, câmera (online e offline), assinatura na tela, finalização com validações e aprovação pelo Owner.
 
@@ -106,6 +108,8 @@ Alguns casos foram verificados **chamando a API diretamente, não pela interface
 
 **Ainda não validado:**
 
+- Instalação a partir de um clone real do repositório (backend e app Flutter, seguindo esta documentação).
+- Compilação do APK debug com o código atual (não foi repetida nesta etapa; o app também não foi testado em cópia limpa).
 - Aparelho físico e iOS (o app nunca foi compilado para iOS).
 - Driver S3 e Sentry contra serviços reais (testados apenas com simulações; sem DSN o Sentry fica desligado).
 - **GitHub Actions:** os workflows existem em `.github/workflows`, mas ainda não foram executados no GitHub.
