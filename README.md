@@ -45,7 +45,7 @@ Guia completo (Windows / PowerShell), com dados de demonstração e geração do
 
 ```powershell
 cd backend
-npm install
+npm ci
 Copy-Item .env.example .env
 # edite backend/.env: DATABASE_URL e JWT_ACCESS_SECRET (veja abaixo)
 npx prisma migrate deploy
@@ -58,6 +58,7 @@ Antes de iniciar, edite `backend/.env`: `DATABASE_URL` e um segredo JWT aleatór
 cd mobile
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
+flutter gen-l10n
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
 ```
 
@@ -95,12 +96,12 @@ O backend é mais completo que o aplicativo. Hoje o app cobre o trabalho do téc
 
 ## Estado do projeto e limites conhecidos
 
-**Testes executados e aprovados** (código atual, na árvore de trabalho):
+**Validação em clone real (Windows).** O repositório público foi clonado em uma pasta nova no commit `6533e5b17fce711e59c25b130425342961dacd33` e validado no Windows:
 
-- Backend: 110 testes unitários (Jest, incluindo a validação do ambiente e a política do segredo JWT), 153 testes do script de dados de demonstração (`node:test`) e 71 de integração contra PostgreSQL real (banco de teste), incluindo concorrência. Prettier, ESLint e build concluídos sem erros.
-- Flutter: 51 testes e `flutter analyze` sem problemas.
-
-**Validação em cópia limpa.** Em uma cópia da pasta `backend` (sem `node_modules`, `dist` nem `.env`), `npm ci`, geração do cliente Prisma, Prettier, ESLint, build e os testes acima (110 unitários, 153 do seed e 71 de integração) passaram. Foi uma cópia de pasta, **não um clone real** do repositório.
+- Backend: `npm ci`, geração do cliente Prisma, Prettier, ESLint e build aprovados. 110 testes unitários (Jest, incluindo a validação do ambiente e a política do segredo JWT), 153 testes do script de dados de demonstração (`node:test`) e 71 de integração contra PostgreSQL real (banco de teste), incluindo concorrência, todos aprovados.
+- Flutter: `flutter pub get`, geração de código e `flutter gen-l10n` concluídos; `flutter analyze` sem problemas; 51 testes aprovados; o APK debug compilou com sucesso.
+- GitHub Actions: Backend CI e Mobile CI aprovados nesse mesmo commit.
+- Os testes de integração usaram apenas o banco de testes; o banco de desenvolvimento não foi utilizado nesta auditoria.
 
 **Validação manual no emulador Android** (Pixel_10, Android 37) contra um backend local, pela interface do app: login, logout (a sessão termina e a família do refresh token é revogada), renovação automática do token de acesso expirado, volta ao login quando o refresh é inválido, execução offline, sincronização ao reconectar, tratamento de operação rejeitada pelo servidor, câmera (online e offline), assinatura na tela, finalização com validações e aprovação pelo Owner.
 
@@ -108,11 +109,9 @@ Alguns casos foram verificados **chamando a API diretamente, não pela interface
 
 **Ainda não validado:**
 
-- Instalação a partir de um clone real do repositório (backend e app Flutter, seguindo esta documentação).
-- Compilação do APK debug com o código atual (não foi repetida nesta etapa; o app também não foi testado em cópia limpa).
+- Linux e macOS: a validação foi feita só no Windows, e as instruções desta documentação são para Windows/PowerShell, sem teste em outros sistemas.
 - Aparelho físico e iOS (o app nunca foi compilado para iOS).
 - Driver S3 e Sentry contra serviços reais (testados apenas com simulações; sem DSN o Sentry fica desligado).
-- **GitHub Actions:** os workflows existem em `.github/workflows`, mas ainda não foram executados no GitHub.
 
 **Limitações:**
 

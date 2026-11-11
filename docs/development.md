@@ -22,7 +22,7 @@ $data = "$env:LOCALAPPDATA\servicecheck-pg"
 
 ```powershell
 cd backend
-npm install
+npm ci
 Copy-Item .env.example .env
 # edite DATABASE_URL e JWT_ACCESS_SECRET em .env (veja "Segredo JWT" abaixo)
 npx prisma migrate deploy
